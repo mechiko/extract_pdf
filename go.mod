@@ -1,6 +1,6 @@
 module extractor
 
-go 1.25.1
+go 1.24.6
 
 require (
 	github.com/gen2brain/go-fitz v1.24.15

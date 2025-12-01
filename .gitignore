@@ -149,6 +149,7 @@ distbin/
 *.syso_*
 *.png
 *.pdf
+*.csv
 
 !*.go
 *.db
