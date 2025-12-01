@@ -21,6 +21,9 @@ func main() {
 
 	root := "."
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if filepath.Ext(path) == ".pdf" {
 			files = append(files, path)
 		}
@@ -66,14 +69,18 @@ func main() {
 			if err != nil {
 				mm[file] = append(mm[file], fmt.Sprintf("%d - %v", n+1, err))
 				fmt.Printf("error %d - %v\n", n+1, err)
-				fn := fmt.Sprintf("%d_%s.png", n+1, file)
+				fn := fmt.Sprintf("%d_%s.png", n+1, filepath.Base(file))
 				errFile := os.WriteFile(fn, b.Bytes(), 0644)
 				if errFile != nil {
 					fmt.Println("Ошибка записи файла:", errFile)
 				}
 				continue
 			}
-			mm[file] = append(mm[file], s[1:])
+			if len(s) > 1 {
+				mm[file] = append(mm[file], s[1:])
+			} else {
+				mm[file] = append(mm[file], s)
+			}
 		}
 	}
 	for k, v := range mm {
@@ -84,9 +91,10 @@ func main() {
 		for _, str := range v {
 			_, err = f.Write([]byte(str + "\n"))
 			if err != nil {
+				f.Close()
 				panic(err)
 			}
 		}
-		defer f.Close()
+		f.Close()
 	}
 }

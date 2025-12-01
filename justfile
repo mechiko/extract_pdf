@@ -2,7 +2,7 @@
 # set positional-arguments
 shebang := 'pwsh.exe'
 # Variables
-exe_name := "extracor"
+exe_name := "extractor"
 mod_name := "extractor"
 ld_flags :="-s -w"
 dist := ".dist"
