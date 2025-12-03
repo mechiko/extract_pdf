@@ -4,7 +4,7 @@ shebang := 'pwsh.exe'
 # Variables
 exe_name := "extractor"
 mod_name := "extractor"
-ld_flags :="-s -w"
+ld_flags :="-H=windowsgui -s -w"
 dist := ".dist"
 
 default:

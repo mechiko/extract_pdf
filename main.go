@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"extractor/licenser"
 	"fmt"
 	"image"
 	"image/png"
@@ -19,8 +20,14 @@ func main() {
 
 	var files []string
 
+	lic, err := licenser.New(licenser.MAC, "")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%v", lic)
+
 	root := "."
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
