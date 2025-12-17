@@ -1,20 +1,22 @@
-package gui
+package licenser
 
 import (
 	"encoding/base64"
 	"fmt"
 
+	"github.com/mechiko/utility"
 	"github.com/mechiko/walk"
 	dcl "github.com/mechiko/walk/declarative"
+	"golang.design/x/clipboard"
 )
 
-func StartDialog(pub string, identity string) (out string, err error) {
+func (l *Licenser) startDialog() (out string, err error) {
 	var dlg *walk.Dialog
 	var acceptPB, cancelPB *walk.PushButton
 	var request, responce *walk.TextEdit
 
-	toServer := fmt.Sprintf("%s@%s", pub, identity)
-	encoded := base64.StdEncoding.EncodeToString([]byte(toServer))
+	toServer := fmt.Sprintf("%s@%s", l.box.LocalPub, l.ParameterValue)
+	encoded64 := base64.StdEncoding.EncodeToString([]byte(toServer))
 	icon, err := walk.Resources.Icon("3")
 	if err != nil {
 		return "", fmt.Errorf("%w", err)
@@ -44,13 +46,14 @@ func StartDialog(pub string, identity string) (out string, err error) {
 								AssignTo: &request,
 								Enabled:  false,
 								MinSize:  dcl.Size{Width: 500},
-								Text:     encoded,
+								Text:     encoded64,
 							},
 							dcl.PushButton{
 								AssignTo: &acceptPB,
 								Text:     "Copy",
 								OnClicked: func() {
-									walk.Clipboard().SetText(encoded)
+									clipboard.Write(clipboard.FmtText, []byte(encoded64))
+									// walk.Clipboard().SetText(encoded64)
 								},
 							},
 							dcl.HSpacer{},
@@ -72,8 +75,14 @@ func StartDialog(pub string, identity string) (out string, err error) {
 								AssignTo: &acceptPB,
 								Text:     "Paste",
 								OnClicked: func() {
-									txt, _ := walk.Clipboard().Text()
-									responce.SetText(txt)
+									data := clipboard.Read(clipboard.FmtText)
+									if data == nil {
+										utility.MessageBox("ошибка", "Clipboard is empty or does not contain text data")
+										return
+									}
+									responce.SetText(string(data))
+									// txt, _ := walk.Clipboard().Text()
+									// responce.SetText(txt)
 								},
 							},
 							dcl.HSpacer{},
@@ -106,7 +115,10 @@ func StartDialog(pub string, identity string) (out string, err error) {
 	}
 
 	if ret := dlg.Run(); ret != 1 {
-		return "", fmt.Errorf("dialog return %d", ret)
+		return "", fmt.Errorf("отмена ввода лицензии")
+	}
+	if out == "" {
+		return "", fmt.Errorf("пустое значение лицензии")
 	}
 	return out, nil
 }

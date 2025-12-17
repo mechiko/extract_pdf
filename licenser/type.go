@@ -3,7 +3,6 @@ package licenser
 import (
 	"encoding/hex"
 	"encoding/json"
-	"extractor/licenser/gui"
 	"fmt"
 	"time"
 
@@ -42,11 +41,13 @@ type Licenser struct {
 	Parameter      Param
 	ParameterValue string
 	Date           time.Time
+	box            *BoxKeys
 }
 
 var root = registry.CURRENT_USER
 
-var nameModuleKey = `Software\NevaKOD\Extractor`
+// var nevakodKey = `Software\NevaKOD`
+var nameModuleKey = `Software\NevaKOD\KorrectKM`
 var nameLicenseKey = `license`
 var nameClientCertPubKey = `certpub`
 var nameClientCertPrivKey = `certpriv`
@@ -63,11 +64,15 @@ var boxLocal *BoxKeys
 // для OmsID и FsrarID значение передаем здесь
 // CpuID и MAC вычисляются из функции по текущему компу
 func New(prm Param, prmValue string) (lic *Licenser, err error) {
+	if err := initBox(); err != nil {
+		return nil, fmt.Errorf("%w", err)
+	}
 	lic = &Licenser{
 		License:        &LicenseInfo{},
 		Parameter:      prm,
 		ParameterValue: prmValue,
 		Date:           time.Time{},
+		box:            boxLocal,
 	}
 	switch prm {
 	case CpuID:
@@ -86,16 +91,22 @@ func New(prm Param, prmValue string) (lic *Licenser, err error) {
 	if lic.ParameterValue == "" {
 		return nil, fmt.Errorf("licenser parameter value empty")
 	}
-	if boxLocal.LocalPub == "" {
+	// переменные box инициализируется в init()
+	// если ключ не сгенирировался или как то обнулен
+	if lic.box.LocalPub == "" {
 		return nil, fmt.Errorf("licenser pub key value empty")
 	}
+	if lic.box.LocalPriv == "" {
+		return nil, fmt.Errorf("licenser priv key value empty")
+	}
+	// переменная модуля инициализируется в init()
 	if licenseKeyValue == "" {
 		// вызываем диалог запроса лицензии
-		licenseKeyValue, err = gui.StartDialog(boxLocal.LocalPub, lic.ParameterValue)
+		licenseKeyValue, err = lic.startDialog()
 		if err != nil {
 			return nil, fmt.Errorf("licenser %w", err)
 		}
-		if err := WriteStringValue(root, nameModuleKey, nameLicenseKey, licenseKeyValue); err != nil {
+		if err := writeStringValue(root, nameModuleKey, nameLicenseKey, licenseKeyValue); err != nil {
 			return nil, fmt.Errorf("licenser %w", err)
 		}
 	}
@@ -103,24 +114,24 @@ func New(prm Param, prmValue string) (lic *Licenser, err error) {
 		// парсим лицензию из json расшифрованной строки
 		jsonApiKey, err := decodeBox(licenseKeyValue)
 		if err != nil {
-			_ = WriteStringValue(root, nameModuleKey, nameLicenseKey, "")
+			_ = writeStringValue(root, nameModuleKey, nameLicenseKey, "")
 			return nil, fmt.Errorf("wrong api key %w", err)
 		}
 		if err := json.Unmarshal([]byte(jsonApiKey), lic.License); err != nil {
-			_ = WriteStringValue(root, nameModuleKey, nameLicenseKey, "")
+			_ = writeStringValue(root, nameModuleKey, nameLicenseKey, "")
 			return nil, fmt.Errorf("wrong api key %w", err)
 		}
 		if lic.ParameterValue != lic.License.Identity {
-			_ = WriteStringValue(root, nameModuleKey, nameLicenseKey, "")
+			_ = writeStringValue(root, nameModuleKey, nameLicenseKey, "")
 			return nil, fmt.Errorf("wrong api param %s license identity %s", lic.ParameterValue, lic.License.Identity)
 		}
 		lic.Date, err = time.Parse(DateLayout, lic.License.Date)
 		if err != nil {
-			_ = WriteStringValue(root, nameModuleKey, nameLicenseKey, "")
+			_ = writeStringValue(root, nameModuleKey, nameLicenseKey, "")
 			return nil, fmt.Errorf("wrong api key date %w", err)
 		}
 		if lic.Date.Before(time.Now()) {
-			_ = WriteStringValue(root, nameModuleKey, nameLicenseKey, "")
+			_ = writeStringValue(root, nameModuleKey, nameLicenseKey, "")
 			return nil, fmt.Errorf("license out od date date %v", lic.Date)
 		}
 		return lic, nil
