@@ -1,0 +1,9 @@
+{
+    "editor.fontFamily": "JetBrains Mono",
+    "editor.fontSize": 16,
+    "editor.fontWeight": "normal",
+    "editor.fontLigatures": true,
+    "window.zoomLevel": 0,
+    "terminal.integrated.mouseWheelZoom": true,
+    "editor.mouseWheelZoom": true
+}
