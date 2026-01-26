@@ -9,6 +9,7 @@ import (
 
 	"github.com/mechiko/dmxing"
 	"github.com/mechiko/dmxing/datamatrix"
+	"github.com/mechiko/dmxing/qrcode/decoder"
 )
 
 func decode(bb []byte) (string, error) {
@@ -23,8 +24,9 @@ func decode(bb []byte) (string, error) {
 	}
 
 	// decode image
+	hints := map[dmxing.DecodeHintType]interface{}{dmxing.DecodeHintType_PURE_BARCODE: decoder.ErrorCorrectionLevel_L}
 	datamatrixReader := datamatrix.NewDataMatrixReader()
-	result, err := datamatrixReader.Decode(bmp, nil)
+	result, err := datamatrixReader.Decode(bmp, hints)
 	if err != nil {
 		return "", fmt.Errorf("%w", err)
 	}

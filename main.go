@@ -8,8 +8,10 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gen2brain/go-fitz"
+	"github.com/mechiko/utility"
 )
 
 type SubImager interface {
@@ -26,9 +28,11 @@ func main() {
 	}
 	fmt.Printf("%v", lic)
 
+	start := time.Now()
 	root := "."
 	err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
 			return err
 		}
 		if filepath.Ext(path) == ".pdf" {
@@ -37,20 +41,25 @@ func main() {
 		return nil
 	})
 	if err != nil {
+		utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
 		panic(err)
 	}
 	mm := make(map[string][]string)
+	count := 0
 	for _, file := range files {
 		doc, err := fitz.New(file)
 		if err != nil {
+			utility.MessageBox("ошибка лицензии", fmt.Sprintf("%v\n%s", err, "перезапустите программу"))
 			panic(err)
 		}
 		// Extract pages as images
 		fmt.Println(file)
 		mm[file] = make([]string, 0)
+		count += doc.NumPage()
 		for n := 0; n < doc.NumPage(); n++ {
 			img, err := doc.Image(n)
 			if err != nil {
+				utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
 				panic(err)
 			}
 			bounds := img.Bounds()
@@ -64,11 +73,13 @@ func main() {
 				croppedImage := img.SubImage(cropSize)
 				err = png.Encode(&b, croppedImage)
 				if err != nil {
+					utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
 					panic(err)
 				}
 			} else {
 				err = png.Encode(&b, img)
 				if err != nil {
+					utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
 					panic(err)
 				}
 			}
@@ -79,7 +90,7 @@ func main() {
 				fn := fmt.Sprintf("%d_%s.png", n+1, filepath.Base(file))
 				errFile := os.WriteFile(fn, b.Bytes(), 0644)
 				if errFile != nil {
-					fmt.Println("Ошибка записи файла:", errFile)
+					utility.MessageBox("Ошибка записи файла:", fmt.Sprintf("%v", err))
 				}
 				continue
 			}
@@ -99,9 +110,11 @@ func main() {
 			_, err = f.Write([]byte(str + "\n"))
 			if err != nil {
 				f.Close()
+				utility.MessageBox("Ошибка записи файла:", fmt.Sprintf("%v", err))
 				panic(err)
 			}
 		}
 		f.Close()
 	}
+	fmt.Printf("затрачено времени %s на %d марок", time.Since(start), count)
 }
