@@ -137,6 +137,7 @@ distbin/
 .dist/
 .DATA/
 .nevakod/
+.out/
 
 # Binaries for programs and plugins
 *.exe

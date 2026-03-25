@@ -3,7 +3,9 @@ module extractor
 go 1.24.6
 
 require (
+	github.com/disintegration/imaging v1.6.2
 	github.com/gen2brain/go-fitz v1.24.15
+	github.com/makiuchi-d/gozxing v0.1.1
 	github.com/mechiko/dmxing v0.0.0-20251125201543-35e439f018b8
 	github.com/mechiko/utility v0.0.0-20250901141646-cc9c20f08412
 	github.com/mechiko/walk v0.0.0-20230816210514-788aa73102d5

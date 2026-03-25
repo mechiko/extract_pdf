@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/disintegration/imaging"
 	"github.com/gen2brain/go-fitz"
 	"github.com/mechiko/utility"
 )
@@ -22,7 +23,7 @@ func main() {
 
 	var files []string
 
-	lic, err := licenser.New(licenser.MAC, "")
+	lic, err := licenser.New(licenser.CpuID, "")
 	if err != nil {
 		panic(err)
 	}
@@ -53,10 +54,11 @@ func main() {
 			panic(err)
 		}
 		// Extract pages as images
-		fmt.Println(file)
+		fmt.Printf("file: %s\n", file)
 		mm[file] = make([]string, 0)
 		count += doc.NumPage()
 		for n := 0; n < doc.NumPage(); n++ {
+			// htmlWrite(doc, n)
 			img, err := doc.Image(n)
 			if err != nil {
 				utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
@@ -67,7 +69,28 @@ func main() {
 				fmt.Printf("размеры этикетки %dx%d\n", bounds.Dx(), bounds.Dy())
 			}
 			var b bytes.Buffer
-			if bounds.Dx() > 400 && bounds.Dy() > 700 {
+			if bounds.Dx() > 2000 && bounds.Dy() > 3000 {
+				cropSize := image.Rect(70, 165, 70+275, 170+275) // +275
+				croppedImage := img.SubImage(cropSize)
+				dstImage := imaging.Resize(croppedImage, 100, 0, imaging.Box)
+				err = png.Encode(&b, dstImage)
+				if err != nil {
+					utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
+					panic(err)
+				}
+				fn := filepath.Join(".out", fmt.Sprintf("crop%d_%s.png", n+1, filepath.Base(file)))
+				errFile := os.WriteFile(fn, b.Bytes(), 0644)
+				if errFile != nil {
+					utility.MessageBox("Ошибка записи файла:", fmt.Sprintf("%v", err))
+				}
+				s, err := decode1(b.Bytes())
+				if err != nil {
+					utility.MessageBox("Ошибка:", fmt.Sprintf("%v", err))
+					panic(err)
+				}
+				fmt.Printf("%d\n", len(s))
+				continue
+			} else if bounds.Dx() > 400 && bounds.Dy() > 700 {
 				cropSize := image.Rect(0, 0, 300, 300)
 				cropSize = cropSize.Add(image.Point{60, 150})
 				croppedImage := img.SubImage(cropSize)
@@ -83,11 +106,12 @@ func main() {
 					panic(err)
 				}
 			}
-			s, err := decode(b.Bytes())
+
+			s, err := decode1(b.Bytes())
 			if err != nil {
 				mm[file] = append(mm[file], fmt.Sprintf("%d - %v", n+1, err))
 				fmt.Printf("error %d - %v\n", n+1, err)
-				fn := fmt.Sprintf("%d_%s.png", n+1, filepath.Base(file))
+				fn := filepath.Join(".out", fmt.Sprintf("%d_%s.png", n+1, filepath.Base(file)))
 				errFile := os.WriteFile(fn, b.Bytes(), 0644)
 				if errFile != nil {
 					utility.MessageBox("Ошибка записи файла:", fmt.Sprintf("%v", err))
@@ -117,4 +141,23 @@ func main() {
 		f.Close()
 	}
 	fmt.Printf("затрачено времени %s на %d марок", time.Since(start), count)
+}
+
+func htmlWrite(doc *fitz.Document, page int) {
+	html, err := doc.HTML(page, true)
+	if err != nil {
+		panic(err)
+	}
+
+	f, err := os.Create(filepath.Join(".out", fmt.Sprintf("test%03d.html", page)))
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = f.WriteString(html)
+	if err != nil {
+		panic(err)
+	}
+
+	f.Close()
 }
