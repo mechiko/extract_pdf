@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	_ "image/png"
+	"strings"
 
 	"github.com/makiuchi-d/gozxing"
 	"github.com/makiuchi-d/gozxing/datamatrix"
@@ -19,5 +20,9 @@ func decode(img image.Image) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%w", err)
 	}
-	return result.GetText(), err
+	return trimPrefixGS(result.GetText()), nil
+}
+
+func trimPrefixGS(code string) string {
+	return strings.TrimPrefix(code, "\x1d")
 }
