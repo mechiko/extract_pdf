@@ -1,8 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"extractor/licenser"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -10,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/disintegration/imaging"
 	"github.com/gen2brain/go-fitz"
 	"github.com/mechiko/utility"
 )
@@ -19,19 +17,25 @@ type SubImager interface {
 	SubImage(r image.Rectangle) image.Image
 }
 
+const outDir = ".out"
+
+var pdfPath = ".data"
+
+const debug = false
+
 func main() {
-
 	var files []string
-
-	lic, err := licenser.New(licenser.CpuID, "")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%v", lic)
-
 	start := time.Now()
-	root := "."
-	err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	if !exists(pdfPath) {
+		pdfPath = "."
+	}
+	// Create path if it doesn't exist (0755 is standard permissions)
+	err := os.MkdirAll(outDir, 0755)
+	if err != nil {
+		utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
+		return
+	}
+	err = filepath.Walk(pdfPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
 			return err
@@ -50,82 +54,31 @@ func main() {
 	for _, file := range files {
 		doc, err := fitz.New(file)
 		if err != nil {
-			utility.MessageBox("ошибка лицензии", fmt.Sprintf("%v\n%s", err, "перезапустите программу"))
+			utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
 			panic(err)
 		}
-		// Extract pages as images
-		fmt.Printf("file: %s\n", file)
+		file = filepath.Base(file)
 		mm[file] = make([]string, 0)
 		count += doc.NumPage()
 		for n := 0; n < doc.NumPage(); n++ {
-			// htmlWrite(doc, n)
 			img, err := doc.Image(n)
 			if err != nil {
 				utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
 				panic(err)
 			}
-			bounds := img.Bounds()
-			if n == 0 {
-				fmt.Printf("размеры этикетки %dx%d\n", bounds.Dx(), bounds.Dy())
-			}
-			var b bytes.Buffer
-			if bounds.Dx() > 2000 && bounds.Dy() > 3000 {
-				cropSize := image.Rect(70, 165, 70+275, 170+275) // +275
-				croppedImage := img.SubImage(cropSize)
-				dstImage := imaging.Resize(croppedImage, 100, 0, imaging.Box)
-				err = png.Encode(&b, dstImage)
-				if err != nil {
-					utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
-					panic(err)
-				}
-				fn := filepath.Join(".out", fmt.Sprintf("crop%d_%s.png", n+1, filepath.Base(file)))
-				errFile := os.WriteFile(fn, b.Bytes(), 0644)
-				if errFile != nil {
-					utility.MessageBox("Ошибка записи файла:", fmt.Sprintf("%v", err))
-				}
-				s, err := decode1(b.Bytes())
-				if err != nil {
-					utility.MessageBox("Ошибка:", fmt.Sprintf("%v", err))
-					panic(err)
-				}
-				fmt.Printf("%d\n", len(s))
-				continue
-			} else if bounds.Dx() > 400 && bounds.Dy() > 700 {
-				cropSize := image.Rect(0, 0, 300, 300)
-				cropSize = cropSize.Add(image.Point{60, 150})
-				croppedImage := img.SubImage(cropSize)
-				err = png.Encode(&b, croppedImage)
-				if err != nil {
-					utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
-					panic(err)
-				}
-			} else {
-				err = png.Encode(&b, img)
-				if err != nil {
-					utility.MessageBox("ошибка", fmt.Sprintf("%v", err))
-					panic(err)
-				}
-			}
-
-			s, err := decode1(b.Bytes())
+			arr, err := parsePage(img, n)
 			if err != nil {
-				mm[file] = append(mm[file], fmt.Sprintf("%d - %v", n+1, err))
-				fmt.Printf("error %d - %v\n", n+1, err)
-				fn := filepath.Join(".out", fmt.Sprintf("%d_%s.png", n+1, filepath.Base(file)))
-				errFile := os.WriteFile(fn, b.Bytes(), 0644)
-				if errFile != nil {
-					utility.MessageBox("Ошибка записи файла:", fmt.Sprintf("%v", err))
-				}
-				continue
+				utility.MessageBox(fmt.Sprintf("ошибка разбора страницы %d", n), fmt.Sprintf("%v", err))
+				panic(err)
 			}
-			if len(s) > 1 {
-				mm[file] = append(mm[file], s[1:])
-			} else {
-				mm[file] = append(mm[file], s)
-			}
+			fmt.Printf("файл %s страница %d найдено марок %d\n", file, n, len(arr))
+			mm[file] = append(mm[file], arr...)
 		}
 	}
+	countKM := 0
 	for k, v := range mm {
+		countKM = countKM + len(v)
+		k = filepath.Join(outDir, k)
 		f, err := os.Create(k + ".csv")
 		if err != nil {
 			panic(err)
@@ -140,7 +93,7 @@ func main() {
 		}
 		f.Close()
 	}
-	fmt.Printf("затрачено времени %s на %d марок", time.Since(start), count)
+	fmt.Printf("затрачено времени %s на %d марок\n", time.Since(start), countKM)
 }
 
 func htmlWrite(doc *fitz.Document, page int) {
@@ -148,16 +101,38 @@ func htmlWrite(doc *fitz.Document, page int) {
 	if err != nil {
 		panic(err)
 	}
-
-	f, err := os.Create(filepath.Join(".out", fmt.Sprintf("test%03d.html", page)))
+	f, err := os.Create(filepath.Join(outDir, fmt.Sprintf("test%03d.html", page)))
 	if err != nil {
 		panic(err)
 	}
-
 	_, err = f.WriteString(html)
 	if err != nil {
 		panic(err)
 	}
-
 	f.Close()
+}
+
+func writeImagePng(img image.Image, file string) error {
+	fileName := filepath.Join(outDir, fmt.Sprintf("%s.png", file))
+	f, err := os.Create(fileName)
+	if err != nil {
+		return fmt.Errorf("%w", err)
+	}
+	defer f.Close()
+	if err := png.Encode(f, img); err != nil {
+		return fmt.Errorf("%w", err)
+	}
+	return nil
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true // Path exists
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false // Path does not exist
+	}
+	// Path might exist, but there was another error (e.g., permission denied)
+	return false
 }
